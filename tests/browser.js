@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, rm, cp, readFile, writeFile } from 'node:fs/promises';
@@ -40,8 +40,17 @@ try {
   for (const name of ['A', 'B', 'C']) {
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
+    await page.bringToFront();
+    await worker.evaluate(async () => {
+      const window = await chrome.windows.getLastFocused();
+      await chrome.windows.update(window.id, { focused: true });
+    });
     await page.goto(`${base}/${name}`); await page.bringToFront(); pages.push(page);
-    await page.waitForTimeout(1900);
+    // Wait for actual capture completion before activation invalidates an in-flight image.
+    await expect.poll(() => worker.evaluate(async url => {
+      const { previews = {} } = await chrome.storage.session.get('previews');
+      return Object.values(previews).some(entry => entry.url === url && entry.image.startsWith('data:image/jpeg;base64,'));
+    }, `${base}/${name}`), { timeout: 10000, message: `Capture preview for Tab ${name}` }).toBe(true);
 
   }
   const [a, b, c] = pages;
