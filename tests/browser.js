@@ -28,8 +28,10 @@ Previews.prototype.captureNow = async function(id) {
   const tab = await chrome.tabs.get(id);
   const entry = { id, url: tab.url, active: tab.active, focused: (await chrome.windows.get(tab.windowId)).focused };
   globalThis.captureDiagnostics.push(entry);
-  try { await capture.call(this, id); } catch (error) { entry.error = error.message; throw error; }
+  let result;
+  try { result = await capture.call(this, id); } catch (error) { entry.error = error.message; throw error; }
   entry.saved = Boolean((await chrome.storage.session.get('previews')).previews?.[id]);
+  return result;
 };
 globalThis.driver = { invoke };`);
 const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));

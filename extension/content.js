@@ -1,4 +1,6 @@
 (() => {
+  if (globalThis.__switchTabContentInstalled) return;
+  globalThis.__switchTabContentInstalled = true;
   const topFrame = window === window.top;
   const releases = { Alt: { down: 0, up: 0, consumed: 0 }, Meta: { down: 0, up: 0, consumed: 0 } };
   let session = null;
@@ -140,6 +142,8 @@
     }, 800);
   };
   window.addEventListener('pageshow', requestPreview);
+  window.addEventListener('focus', requestPreview);
+  requestPreview();
   window.addEventListener('scroll', requestPreview, { passive: true });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) requestPreview(); });
 })();

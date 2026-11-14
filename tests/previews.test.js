@@ -56,3 +56,28 @@ test('a switcher opened and closed during capture invalidates the image', async 
   f.api.tabs.captureVisibleTab = async () => { epoch++; return 'not-an-image'; };
   await f.manager.capture(1); assert.deepEqual(f.state.previews, {});
 });
+
+test('scheduled capture retries transient failures and stops after success', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(); let calls = 0;
+  f.manager.capture = async () => { if (++calls === 1) throw new Error('image readback failed'); return true; };
+  f.manager.schedule(1);
+  t.mock.timers.tick(200); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 1);
+  t.mock.timers.tick(750); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 2);
+  t.mock.timers.tick(5000); assert.equal(calls, 2);
+});
+
+test('retry is bounded and a newly scheduled tab supersedes old work', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(); const ids = [];
+  f.manager.capture = async id => { ids.push(id); return false; };
+  f.manager.schedule(1);
+  t.mock.timers.tick(200); await new Promise(resolve => setImmediate(resolve));
+  f.manager.schedule(2);
+  for (const delay of [200, 750, 750, 5000]) {
+    t.mock.timers.tick(delay); await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.deepEqual(ids, [1, 2, 2, 2]);
+});

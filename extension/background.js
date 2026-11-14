@@ -1,7 +1,9 @@
 import './core.js';
 import { Previews } from './previews.js';
 import { CenteredSwitcher } from './centered.js';
-const previews = new Previews(chrome);
+import { ContentBridge } from './content-bridge.js';
+const contentBridge = new ContentBridge(chrome);
+const previews = new Previews(chrome, id => contentBridge.status(id));
 const centered = new CenteredSwitcher(chrome);
 let operations = Promise.resolve();
 const enqueue = task => {
@@ -51,7 +53,9 @@ async function commit(message, sender) {
 async function handle(message, sender) {
   if (sender.id !== chrome.runtime.id || (!sender.tab && !ownPage(sender))) return;
   if (message.type === 'preview-request' && sender.tab && sender.frameId === 0) {
-    previews.schedule(sender.tab.id); return {};
+    const generation = previews.generation;
+    const source = await activeSource(sender);
+    previews.schedule(source.id, generation); return {};
   }
   if (message.type === 'frame-key' && sender.tab) {
     // Keyboard events do not bubble out of an iframe. Relay only trusted
@@ -113,6 +117,7 @@ async function dispatch(command, tab) {
     shortcut: shortcuts.find(item => item.name === command)?.shortcut || '' };
   if (command !== 'toolbar') {
     try {
+      await contentBridge.status(source.id);
       const result = await chrome.tabs.sendMessage(source.id, message, { frameId: 0 });
       if (result?.handled) return;
     } catch { /* Restricted page or content script not yet loaded. */ }
@@ -138,7 +143,11 @@ chrome.windows.onRemoved.addListener(id => {
     if (record && (id === record.panelWindowId || id === record.windowId)) await centered.close(false);
   });
 });
-chrome.windows.onFocusChanged.addListener(() => {
+chrome.windows.onFocusChanged.addListener(id => {
+  // Reserve at event time: an older window query must never win a later focus change.
+  const generation = previews.cancelScheduled();
+  if (id >= 0) void chrome.tabs.query({ windowId: id, active: true })
+    .then(tabs => { if (tabs[0]) previews.schedule(tabs[0].id, generation); }).catch(() => {});
   void enqueue(async () => {
     const record = await centered.get();
     if (!record) return;
@@ -161,3 +170,10 @@ chrome.tabs.onUpdated.addListener((id, change, tab) => {
   if (tab.active && change.status === 'complete') previews.schedule(id);
 });
 chrome.tabs.onDetached.addListener(id => { void previews.invalidate(id); });
+
+// Reconnect the visible page after install/update, without refreshing user pages.
+chrome.runtime.onInstalled.addListener(() => {
+  const generation = previews.generation;
+  void chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    .then(tabs => { if (tabs[0]) previews.schedule(tabs[0].id, generation); }).catch(() => {});
+});

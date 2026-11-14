@@ -10,7 +10,9 @@ export function trimPreviews(entries) {
 }
 
 export class Previews {
-  constructor(api) {
+  constructor(api, status = id => api.tabs.sendMessage(id, { type: 'preview-safe' }, { frameId: 0 })) {
+    this.status = status;
+    this.generation = 0;
     this.api = api;
     this.revisions = new Map();
     this.writes = Promise.resolve();
@@ -28,14 +30,26 @@ export class Previews {
     this.revisions.set(id, (this.revisions.get(id) || 0) + 1);
     return this.write(entries => { delete entries[id]; });
   }
-  schedule(id) {
+  cancelScheduled() {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => { void this.capture(id).catch(() => {}); }, 700);
+    return ++this.generation;
+  }
+  schedule(id, expectedGeneration = this.generation) {
+    if (expectedGeneration !== this.generation) return;
+    const generation = this.cancelScheduled();
+    const attempt = async remaining => {
+      const captured = await this.capture(id).catch(() => false);
+      // A new tab/request replaces this job; never resurrect an obsolete capture.
+      if (!captured && remaining && generation === this.generation) {
+        this.timer = setTimeout(() => { void attempt(remaining - 1); }, 750);
+      }
+    };
+    this.timer = setTimeout(() => { void attempt(2); }, 200);
   }
   async capture(id) {
-    if (this.busy) return;
+    if (this.busy) return false;
     this.busy = true;
-    try { await this.captureNow(id); } finally { this.busy = false; }
+    try { return await this.captureNow(id); } finally { this.busy = false; }
   }
   async captureNow(id) {
     if (Date.now() - this.lastCapture < 650) return;
@@ -46,11 +60,11 @@ export class Previews {
     if (!(await api.windows.get(tab.windowId)).focused) return;
     const revision = this.revisions.get(id) || 0;
     this.revisions.set(id, revision);
-    const safe = await api.tabs.sendMessage(id, { type: 'preview-safe' }, { frameId: 0 });
+    const safe = await this.status(id);
     if (!safe?.safe || safe.url !== tab.url) return;
     const image = await api.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 65 });
     const current = await api.tabs.get(id);
-    const after = await api.tabs.sendMessage(id, { type: 'preview-safe' }, { frameId: 0 });
+    const after = await this.status(id);
     if (!current.active || current.url !== tab.url || !after?.safe || after.epoch !== safe.epoch ||
         (this.revisions.get(id) || 0) !== revision) return;
     const bitmap = await createImageBitmap(await (await fetch(image)).blob());
@@ -63,11 +77,14 @@ export class Previews {
     let binary = '';
     for (const byte of bytes) binary += String.fromCharCode(byte);
     const thumbnail = `data:image/jpeg;base64,${btoa(binary)}`;
+    let saved = false;
     await this.write(entries => {
       if ((this.revisions.get(id) || 0) === revision) {
         entries[id] = { image: thumbnail, url: tab.url, windowId: tab.windowId, at: Date.now() };
+        saved = true;
       }
     });
+    return saved;
   }
   async attach(tabs, windowId) {
     const { previews = {} } = await this.api.storage.session.get('previews');

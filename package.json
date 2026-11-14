@@ -1,14 +1,14 @@
 {
   "name": "switch-tab",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "test:browser": "node tests/browser.js",
+    "test:browser": "node tests/browser.js && node tests/preview-browser.js",
     "check": "node scripts/check.js",
     "package": "node scripts/package.js",
-    "test:browser:headed": "HEADED=1 node tests/browser.js"
+    "test:browser:headed": "HEADED=1 npm run test:browser"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1"
