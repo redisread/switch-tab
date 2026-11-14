@@ -43,7 +43,7 @@ window.addEventListener('keyup', event => {
 window.addEventListener('keydown', event => {
   releasedKeys.delete(event.key);
   if (event.key === 'Escape') { event.preventDefault(); cancel(true); return; }
-  if (event.key === 'Enter' && event.target.id !== 'shortcuts') { event.preventDefault(); void confirm(); }
+  if (event.key === 'Enter') { event.preventDefault(); void confirm(); }
   if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
     event.preventDefault(); select(['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1);
   }
@@ -51,10 +51,6 @@ window.addEventListener('keydown', event => {
 let hasFocused = document.hasFocus();
 window.addEventListener('focus', () => { hasFocused = true; });
 window.addEventListener('blur', () => { if (hasFocused && !committing) cancel(false); });
-document.querySelector('#shortcuts').addEventListener('click', async () => {
-  await chrome.tabs.create({ windowId: data.windowId, url: 'chrome://extensions/shortcuts' });
-  cancel(true);
-});
 
 (async () => {
   try {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Switch Tab — 最近标签切换",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "横向缩略图卡片切换最近标签。⌘X 选择，松开 ⌘ 确认。",
   "minimum_chrome_version": "127",
   "incognito": "not_allowed",

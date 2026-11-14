@@ -2,7 +2,7 @@ export const PANEL_KEY = 'centeredSwitcher';
 
 export function centeredBounds(source, count) {
   const width = Math.min(1040, Math.max(280, source.width || 1040), Math.max(280, count * 200 + 32));
-  const height = Math.min(280, source.height || 280);
+  const height = Math.min(224, source.height || 224);
   return { width, height,
     left: Math.round((source.left || 0) + ((source.width || width) - width) / 2),
     top: Math.round((source.top || 0) + ((source.height || height) - height) / 2) };

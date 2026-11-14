@@ -1,6 +1,4 @@
 :root { color-scheme: light dark; }
-body { width:100%;min-height:100vh;margin:0;display:grid;align-content:center;background:#e7e3f2;font:12px -apple-system,BlinkMacSystemFont,sans-serif; }
-nav { padding:0 22px 16px; }
-button { background:none;border:0;padding:4px 0;color:#4b58c8;font:inherit;cursor:pointer; }
-button:focus-visible { outline:2px solid #6574ed;outline-offset:4px; }
-@media(prefers-color-scheme:dark) { body { background:#2f2a3b; } button { color:#abb6ff; } }
+body { width:100%;min-height:100vh;margin:0;display:grid;align-content:center;background:#eff0f3;color:#252933;font:12px -apple-system,BlinkMacSystemFont,sans-serif; }
+#mount { min-width:0; }
+@media(prefers-color-scheme:dark) { body { background:#24262b;color:#eef0f4; } }

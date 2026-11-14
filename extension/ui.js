@@ -8,37 +8,34 @@ globalThis.SwitchTabUI = class {
     style.textContent = `
       :host { color-scheme:light dark; }
       * { box-sizing:border-box; }
-      .backdrop { position:fixed;inset:0;background:rgba(22,20,32,.12);display:grid;place-items:center;padding:24px; }
-      .panel { width:max-content;max-width:min(1140px,100%);padding:12px;border:1px solid #ffffff80;border-radius:22px;background:rgba(237,238,241,.97);color:#292535;box-shadow:0 24px 80px #1c142a38,0 4px 16px #1c142a18;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+      .backdrop { position:fixed;inset:0;background:rgba(20,24,32,.08);display:grid;place-items:center;padding:24px; }
+      .panel { width:max-content;max-width:min(1140px,100%);padding:10px;border:1px solid #ffffffb3;border-radius:24px;background:rgba(239,240,243,.97);color:#252933;box-shadow:0 18px 56px #11182726,0 2px 8px #11182712;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
       .popup { width:100%;max-width:100%;border:0;border-radius:0;box-shadow:none; }
-      header { display:none; }
       .popup .list { width:max-content;max-width:100%;margin:auto; }
       .list { outline:none;display:flex;gap:6px;padding:2px;overflow-x:auto;overscroll-behavior:contain;scrollbar-width:thin;max-width:100%; }
-      .row { flex:0 0 194px;width:194px;min-width:0;padding:9px;border:2px solid transparent;border-radius:10px;text-align:left;color:inherit;cursor:pointer;background:transparent; }
-      .row[aria-selected=true] { border-color:#9eb8c5;background:#cbdde5;box-shadow:none; }
-      .caption { display:flex;align-items:center;gap:8px;padding:10px 2px 1px; }
+      .row { flex:0 0 194px;width:194px;min-width:0;padding:5px;border:1px solid transparent;border-radius:13px;text-align:left;color:inherit;cursor:pointer;background:transparent; }
+      .row[aria-selected=true] { border-color:#92adbe;background:#dfe9ef;box-shadow:0 1px 3px #1825360d; }
+      .caption { display:flex;align-items:center;gap:8px;padding:9px 5px 5px; }
       .icon { flex-shrink:0;width:20px;height:20px;display:grid;place-items:center;border-radius:5px;color:#655785;font-size:14px;font-weight:600; }
       .icon img { width:18px;height:18px;object-fit:contain; }
       .text { min-width:0;flex:1; }
-      .title { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600; }
+      .title { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:550; }
       .domain { display:none; }
-      .preview { height:112px;width:100%;overflow:hidden;position:relative;border-radius:8px;background:linear-gradient(145deg,#e9e4f2,#dcd5eb); }
+      .preview { height:112px;width:100%;overflow:hidden;position:relative;border-radius:7px;background:linear-gradient(145deg,#e6e9ee,#dde2e9); }
       .thumbnail { display:block;width:100%;height:100%;object-fit:cover;object-position:top;outline:1px solid #0000001a;outline-offset:-1px; }
-      .placeholder { height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#655d76;font-size:11px; }
-      .placeholder strong { font-size:30px;font-weight:500; }
-      .mark { color:#655785;font-size:13px;visibility:hidden; }
-      [aria-selected=true] .mark { visibility:visible; }
+      .placeholder { height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#687386;font-size:11px; }
+      .placeholder strong { font-size:26px;font-weight:500; }
       footer { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%); }
       footer.error { position:static;width:auto;height:auto;clip-path:none;padding:10px;color:#625a71;font-size:12px; }
       .empty { padding:32px;text-align:center;color:#625a71; }
       @media(hover:hover) { .row:hover { background:#fff; } }
       @media(prefers-color-scheme:dark) {
-        .panel { background:rgba(26,27,29,.97);color:#f1edf8;border-color:#ffffff1f; }
+        .panel { background:rgba(36,38,43,.97);color:#f1edf8;border-color:#ffffff1f; }
         .row { background:transparent; }
-        .row[aria-selected=true] { background:#3b515d;border-color:#6b8999; }
-        .preview { background:linear-gradient(145deg,#494054,#38313f); }
-        .placeholder,footer,.empty { color:#c7bdce; }
-        .icon,.mark { color:#d5c4eb; }
+        .row[aria-selected=true] { background:#35434f;border-color:#7b97ad; }
+        .preview { background:linear-gradient(145deg,#353b44,#2d333c); }
+        .placeholder,footer,.empty { color:#b7c0ce; }
+        .icon { color:#bdc7d7; }
         .thumbnail { outline-color:#ffffff1a; }
         @media(hover:hover) { .row:hover { background:#343b40; } }
       }
@@ -53,12 +50,6 @@ globalThis.SwitchTabUI = class {
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', '最近使用的标签');
-    const header = document.createElement('header');
-    const title = document.createElement('h1');
-    title.textContent = '最近使用';
-    const count = document.createElement('span');
-    count.className = 'count'; count.textContent = `${tabs.length} 个标签`;
-    header.append(title, count);
     this.list = document.createElement('div');
     this.list.className = 'list'; this.list.tabIndex = 0;
     this.list.setAttribute('role', 'listbox');
@@ -83,9 +74,8 @@ globalThis.SwitchTabUI = class {
       const name = document.createElement('div'); name.className = 'title'; name.textContent = tab.title;
       const domain = document.createElement('div'); domain.className = 'domain'; domain.textContent = SwitchTab.domain(tab.url);
       text.append(name, domain);
-      const mark = document.createElement('span'); mark.className = 'mark'; mark.textContent = '↵'; mark.setAttribute('aria-hidden', 'true');
       const caption = document.createElement('div'); caption.className = 'caption';
-      caption.append(icon, text, mark);
+      caption.append(icon, text);
       const preview = document.createElement('div'); preview.className = 'preview';
       const placeholder = () => {
         const empty = document.createElement('div'); empty.className = 'placeholder';
@@ -109,7 +99,7 @@ globalThis.SwitchTabUI = class {
     }
     this.footer = document.createElement('footer'); this.footer.textContent = hint;
     this.footer.setAttribute('role', 'status');
-    panel.append(header, this.list, this.footer); backdrop.append(panel); this.root.append(backdrop);
+    panel.append(this.list, this.footer); backdrop.append(panel); this.root.append(backdrop);
     backdrop.addEventListener('click', event => { if (event.target === backdrop) onCancel(); });
     mount.append(this.host);
     this.previousFocus = document.activeElement;
