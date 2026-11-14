@@ -20,12 +20,15 @@ jobs:
           xvfb-run -a bash -ec '
             openbox >/tmp/switch-tab-openbox.log 2>&1 &
             window_manager_pid=$!
-            trap "kill $window_manager_pid" EXIT
+            trap "kill $window_manager_pid 2>/dev/null || true" EXIT
             for attempt in {1..50}; do
               if xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"; then break; fi
               sleep 0.1
             done
-            xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"
+            if ! xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"; then
+              cat /tmp/switch-tab-openbox.log
+              exit 1
+            fi
             npm run test:browser:headed
           '
       - run: npm run package
