@@ -12,6 +12,7 @@ let activated;
 globalThis.chrome = {
   runtime: { id: 'test', getURL: path => `chrome-extension://test/${path}`,
     onMessage: { addListener: fn => { listener = fn; } } },
+  action: { onClicked: { addListener() {} } },
   commands: { onCommand: { addListener() {} } },
   tabs: {
     query: async query => tabs.filter(tab => (!query.active || tab.active) &&
@@ -19,7 +20,7 @@ globalThis.chrome = {
     get: async id => { const tab = tabs.find(tab => tab.id === id); if (!tab) throw new Error('No tab'); return tab; },
     update: async id => { activated = id; }, onRemoved: { addListener() {} }, onActivated: { addListener() {} }, onUpdated: { addListener() {} }, onDetached: { addListener() {} },
   },
-  windows: { get: async id => ({ id, focused }), getLastFocused: async () => ({ id: lastFocused }) },
+  windows: { get: async id => ({ id, focused }), getLastFocused: async () => ({ id: lastFocused }), onRemoved: { addListener() {} }, onFocusChanged: { addListener() {} } },
   storage: { session: {
     get: async key => ({ [key]: store[key] }),
     set: async values => Object.assign(store, values),
@@ -49,10 +50,6 @@ test('moved targets and background content frames cannot activate a tab', async 
   assert.equal((await message({ type: 'snapshot' })).ok, false);
   focused = true;
 });
-test('native popup may own focus but must match the last focused browser window', async () => {
-  focused = false;
-  assert.equal((await message({ type: 'snapshot' }, popup)).ok, true);
-  lastFocused = 2;
-  assert.equal((await message({ type: 'snapshot' }, popup)).ok, false);
-  lastFocused = 1; focused = true;
+test('unregistered extension pages cannot impersonate a source tab', async () => {
+  assert.equal((await message({ type: 'panel-init', token: 'forged' }, popup)).ok, false);
 });

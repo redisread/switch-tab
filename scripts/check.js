@@ -5,6 +5,6 @@ if (manifest.manifest_version !== 3 || manifest.incognito !== 'not_allowed') thr
 for (const file of await readdir('extension')) {
   if (file.endsWith('.js')) execFileSync(process.execPath, ['--check', `extension/${file}`]);
 }
-for (const file of [manifest.background.service_worker, manifest.action.default_popup,
+for (const file of [manifest.background.service_worker, 'popup.html',
   ...manifest.content_scripts.flatMap(script => script.js)]) await readFile(`extension/${file}`);
 console.log('Manifest resources and JavaScript syntax verified.');

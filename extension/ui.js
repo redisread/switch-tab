@@ -10,8 +10,9 @@ globalThis.SwitchTabUI = class {
       * { box-sizing:border-box; }
       .backdrop { position:fixed;inset:0;background:rgba(22,20,32,.12);display:grid;place-items:center;padding:24px; }
       .panel { width:max-content;max-width:min(1140px,100%);padding:12px;border:1px solid #ffffff80;border-radius:22px;background:rgba(237,238,241,.97);color:#292535;box-shadow:0 24px 80px #1c142a38,0 4px 16px #1c142a18;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-      .popup { width:760px;max-width:100%;border:0;border-radius:0;box-shadow:none; }
+      .popup { width:100%;max-width:100%;border:0;border-radius:0;box-shadow:none; }
       header { display:none; }
+      .popup .list { width:max-content;max-width:100%;margin:auto; }
       .list { outline:none;display:flex;gap:6px;padding:2px;overflow-x:auto;overscroll-behavior:contain;scrollbar-width:thin;max-width:100%; }
       .row { flex:0 0 194px;width:194px;min-width:0;padding:9px;border:2px solid transparent;border-radius:10px;text-align:left;color:inherit;cursor:pointer;background:transparent; }
       .row[aria-selected=true] { border-color:#9eb8c5;background:#cbdde5;box-shadow:none; }

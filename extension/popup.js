@@ -1,50 +1,70 @@
-let data, ui, offset = 0, committing = false;
-const send = message => chrome.runtime.sendMessage(message);
-const select = delta => {
-  offset += delta;
+const token = location.hash.slice(1);
+let data, ui, offset = 0, version = -1, committing = false, releaseKey = null;
+let pending = Promise.resolve();
+const releasedKeys = new Set();
+const send = async message => {
+  const result = await chrome.runtime.sendMessage({ ...message, token });
+  if (!result?.ok) throw new Error(result?.error || '切换窗口不可用');
+  return result.data;
+};
+const apply = state => {
+  if (state.version < version) return;
+  version = state.version; offset = state.offset;
   if (data) ui?.select(SwitchTab.wrap(offset, data.tabs.length));
 };
-
+const fail = error => {
+  if (ui) ui.error(`${error.message} · Esc 关闭后重试`);
+  else document.querySelector('#mount').textContent = error.message;
+};
+const select = (delta, index) => {
+  pending = pending.then(() => send({ type: 'panel-step', delta, index })).then(apply);
+  pending.catch(fail);
+};
+const cancel = restore => {
+  void send({ type: 'panel-cancel', restore }).catch(() => window.close());
+};
 async function confirm() {
   if (committing || !data?.tabs.length) return;
   committing = true;
   try {
-    const result = await send({ type: 'commit', token: data.token,
-      targetId: data.tabs[SwitchTab.wrap(offset, data.tabs.length)].id });
-    if (!result?.ok) throw new Error(result?.error || '切换失败');
-    window.close();
-  } catch (error) { committing = false; ui.error(`${error.message} · 请关闭后重试`); }
+    await pending;
+    await send({ type: 'panel-commit' });
+  } catch (error) { committing = false; fail(error); }
 }
 
-chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id === chrome.runtime.id && message.type === 'invoke' && (!data || data.sourceId === message.sourceId)) {
-    select(message.delta); respond({ handled: true });
-  }
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (sender.id === chrome.runtime.id && message.type === 'panel-state' && message.token === token) apply(message);
 });
+window.addEventListener('keyup', event => {
+  if (!event.isTrusted || !['Meta', 'Alt'].includes(event.key)) return;
+  releasedKeys.add(event.key);
+  if (event.key === releaseKey) void confirm();
+}, true);
 window.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { window.close(); return; }
+  releasedKeys.delete(event.key);
+  if (event.key === 'Escape') { event.preventDefault(); cancel(true); return; }
   if (event.key === 'Enter' && event.target.id !== 'shortcuts') { event.preventDefault(); void confirm(); }
   if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
     event.preventDefault(); select(['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1);
   }
 });
-document.querySelector('#shortcuts').addEventListener('click', () => {
-  void chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }); window.close();
+let hasFocused = document.hasFocus();
+window.addEventListener('focus', () => { hasFocused = true; });
+window.addEventListener('blur', () => { if (hasFocused && !committing) cancel(false); });
+document.querySelector('#shortcuts').addEventListener('click', async () => {
+  await chrome.tabs.create({ windowId: data.windowId, url: 'chrome://extensions/shortcuts' });
+  cancel(true);
 });
 
 (async () => {
   try {
-    const result = await send({ type: 'snapshot' });
-    if (!result?.ok) throw new Error(result?.error || '无法读取标签');
-    data = result.data;
-    const { popupInvocation } = await chrome.storage.session.get('popupInvocation');
-    await chrome.storage.session.remove('popupInvocation');
-    if (popupInvocation?.sourceId === data.sourceId && Date.now() - popupInvocation.at < 2000 && popupInvocation.delta < 0) offset--;
+    data = await send({ type: 'panel-init' });
+    apply(data);
+    releaseKey = SwitchTab.releaseKey(data.shortcut);
+    if (releasedKeys.has(releaseKey)) { await confirm(); return; }
     ui = new SwitchTabUI({ mount: document.querySelector('#mount'), tabs: data.tabs, popup: true,
-      hint: 'Enter 确认 · ←→ 选择 · Esc 取消',
-      onChoose: index => { offset = index; void confirm(); }, onCancel: () => window.close() });
+      hint: releaseKey ? `松开 ${releaseKey === 'Meta' ? '⌘' : '⌥'} 确认 · ←→ 选择 · Esc 取消` : 'Enter 确认 · ←→ 选择 · Esc 取消',
+      onChoose: index => { select(0, index); void confirm(); }, onCancel: () => cancel(true) });
     ui.select(SwitchTab.wrap(offset, data.tabs.length));
-  } catch (error) {
-    document.querySelector('#mount').textContent = `${error.message}，请关闭后重试。`;
-  }
+  } catch (error) { fail(error); }
 })();

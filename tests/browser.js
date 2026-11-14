@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, cp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 
@@ -17,10 +17,16 @@ const server = createServer((req, res) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 const profile = await mkdtemp(join(tmpdir(), 'switch-tab-test-'));
-const extension = resolve('extension');
+const extension = join(profile, 'extension');
+await cp(resolve('extension'), extension, { recursive: true });
+// Test-only worker entry invokes the same production router as Chrome events.
+await writeFile(join(extension, 'driver.js'), "import { invoke } from './background.js'; globalThis.driver = { invoke };");
+const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
+manifest.background.service_worker = 'driver.js';
+await writeFile(join(extension, 'manifest.json'), JSON.stringify(manifest));
 const context = await chromium.launchPersistentContext(profile, {
-  channel: 'chromium', headless: process.env.HEADED !== '1',
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  channel: 'chromium', viewport: null, headless: process.env.HEADED !== '1',
+  args: [ `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
@@ -101,27 +107,29 @@ try {
   assert.equal(await active(), 'Tab B'); await b.keyboard.press('Escape');
   console.log('PASS closed target fails safely');
 
-  const nativePopupSource = await worker.evaluate(async () => {
+  // Exercise the actual fallback by opening a registered independent window.
+  // Use the exported router so this includes source binding and session creation.
+  const panelPagePromise = context.waitForEvent('page');
+  panelPagePromise.catch(() => {});
+  const sourceWindow = await worker.evaluate(async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    await chrome.storage.session.remove(`session:${tab.id}`);
-    await chrome.action.openPopup();
-    return tab.id;
+    const bounds = await chrome.windows.get(tab.windowId);
+    await Promise.all([driver.invoke('toolbar', tab), driver.invoke('switch-next', tab)]);
+    return bounds;
   });
-  let nativeSession;
-  for (let n = 0; n < 40; n++) {
-    nativeSession = await worker.evaluate(async id => (await chrome.storage.session.get(`session:${id}`))[`session:${id}`], nativePopupSource);
-    if (nativeSession) break;
-    await b.waitForTimeout(50);
-  }
-  assert.ok(nativeSession?.token, 'Native action popup must create a valid selection session');
-  await a.bringToFront();
-  console.log('PASS actual action popup opens and reads source window');
-
-  const extensionId = new URL(worker.url()).host;
-  const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
-  await popup.waitForTimeout(200);
-  await popup.setViewportSize({ width: 760, height: 260 });
+  const popup = await panelPagePromise;
+  await popup.waitForLoadState();
+  await popup.waitForTimeout(300);
+  const panelState = await worker.evaluate(async () => {
+    const { centeredSwitcher } = await chrome.storage.session.get('centeredSwitcher');
+    return { record: centeredSwitcher, window: await chrome.windows.get(centeredSwitcher.panelWindowId) };
+  });
+  assert.equal(panelState.record.offset, 1, 'Repeat queued before panel focus must advance rather than reopen');
+  assert.ok(Math.abs(panelState.window.left + panelState.window.width / 2 - (sourceWindow.left + sourceWindow.width / 2)) <= 2);
+  assert.ok(Math.abs(panelState.window.top + panelState.window.height / 2 - (sourceWindow.top + sourceWindow.height / 2)) <= 2);
+  assert.equal(await popup.locator('#mount').evaluate(el => el.childElementCount), 1,
+    await popup.locator('#mount').textContent());
+  console.log('PASS centered independent window with fixed source');
   await popup.screenshot({ path: 'test-results/popup.png' });
   const layout = await popup.evaluate(() => {
     const cards = ui.rows.map(row => ({ x: row.getBoundingClientRect().x, y: row.getBoundingClientRect().y }));
@@ -134,8 +142,64 @@ try {
   await popup.emulateMedia({ colorScheme: 'dark' });
   await popup.screenshot({ path: 'test-results/popup-dark.png' });
   console.log('PASS horizontal preview-first card layout / dark theme');
-  assert.equal(await popup.locator('#mount').evaluate(el => el.childElementCount), 1);
-  console.log('PASS popup renders with real extension API');
+  await popup.keyboard.press('Escape');
+  await b.bringToFront();
+
+  await b.goto('chrome://version');
+  const releasePanelPromise = context.waitForEvent('page');
+  releasePanelPromise.catch(() => {});
+  await worker.evaluate(async shortcut => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await driver.invoke('switch-next', tab);
+  }, actualShortcut);
+  const releasePanel = await releasePanelPromise;
+  await releasePanel.waitForLoadState(); await releasePanel.waitForTimeout(150);
+  await releasePanel.keyboard.down(modifier);
+  await releasePanel.keyboard.press('x');
+  assert.equal(await active(), 'Switch Tab'); // X release alone does not commit.
+  await releasePanel.keyboard.up(modifier);
+  await waitActive('Tab A');
+  console.log('PASS centered window commits on modifier release, not X release');
+
+  // Slow only the panel's init response; release while its UI data is pending.
+  await context.addInitScript(() => {
+    if (location.pathname !== '/popup.html' || location.protocol !== 'chrome-extension:') return;
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = async message => {
+      const result = await send(message);
+      if (message.type === 'panel-init') await new Promise(resolve => setTimeout(resolve, 800));
+      return result;
+    };
+  });
+  await b.bringToFront();
+  const earlyPagePromise = context.waitForEvent('page'); earlyPagePromise.catch(() => {});
+  await worker.evaluate(async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await driver.invoke('switch-next', tab);
+  });
+  const earlyPage = await earlyPagePromise; await earlyPage.waitForLoadState();
+  assert.equal(await earlyPage.evaluate(() => typeof data), 'undefined');
+  await earlyPage.keyboard.down(modifier); await earlyPage.keyboard.up(modifier);
+  await waitActive('Tab A');
+  console.log('PASS modifier release during pending panel initialization');
+
+  if (process.env.HEADED === '1') {
+  const blurPagePromise = context.waitForEvent('page'); blurPagePromise.catch(() => {});
+  await worker.evaluate(async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await driver.invoke('toolbar', tab);
+  });
+  const blurPage = await blurPagePromise; await blurPage.waitForLoadState();
+  await blurPage.waitForTimeout(900);
+  const closed = blurPage.waitForEvent('close', { timeout: 5000 }); closed.catch(() => {});
+  const otherId = await worker.evaluate(async url => (await chrome.windows.create({ url, focused: true })).id, `${base}/other`);
+  await worker.evaluate(id => chrome.windows.update(id, { focused: true }), otherId);
+  await closed;
+  assert.equal(await worker.evaluate(async () => (await chrome.windows.getLastFocused()).id), otherId);
+  assert.equal(await worker.evaluate(async () => Boolean((await chrome.storage.session.get('centeredSwitcher')).centeredSwitcher)), false);
+  await worker.evaluate(id => chrome.windows.remove(id), otherId);
+  console.log('PASS focus loss closes the switcher without stealing another window focus');
+  } else console.log('SKIP native window focus: run npm run test:browser:headed');
   assert.deepEqual(errors, []);
 } finally {
   await context.close(); await new Promise(resolve => server.close(resolve));
