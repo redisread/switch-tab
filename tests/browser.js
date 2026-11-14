@@ -20,7 +20,18 @@ const profile = await mkdtemp(join(tmpdir(), 'switch-tab-test-'));
 const extension = join(profile, 'extension');
 await cp(resolve('extension'), extension, { recursive: true });
 // Test-only worker entry invokes the same production router as Chrome events.
-await writeFile(join(extension, 'driver.js'), "import { invoke } from './background.js'; globalThis.driver = { invoke };");
+await writeFile(join(extension, 'driver.js'), `import { invoke } from './background.js';
+import { Previews } from './previews.js';
+const capture = Previews.prototype.captureNow;
+globalThis.captureDiagnostics = [];
+Previews.prototype.captureNow = async function(id) {
+  const tab = await chrome.tabs.get(id);
+  const entry = { id, url: tab.url, active: tab.active, focused: (await chrome.windows.get(tab.windowId)).focused };
+  globalThis.captureDiagnostics.push(entry);
+  try { await capture.call(this, id); } catch (error) { entry.error = error.message; throw error; }
+  entry.saved = Boolean((await chrome.storage.session.get('previews')).previews?.[id]);
+};
+globalThis.driver = { invoke };`);
 const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
 manifest.background.service_worker = 'driver.js';
 await writeFile(join(extension, 'manifest.json'), JSON.stringify(manifest));
@@ -44,16 +55,21 @@ try {
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
     await page.bringToFront();
-    await worker.evaluate(async () => {
+    await expect.poll(() => worker.evaluate(async () => {
       const window = await chrome.windows.getLastFocused();
       await chrome.windows.update(window.id, { focused: true });
-    });
+      return (await chrome.windows.get(window.id)).focused;
+    }), { timeout: 10000, message: 'Native browser window focused before navigation' }).toBe(true);
+    await page.waitForFunction(() => document.hasFocus(), undefined, { timeout: 10000 });
     await page.goto(`${base}/${name}`); await page.bringToFront(); pages.push(page);
     // Wait for actual capture completion before activation invalidates an in-flight image.
     await expect.poll(() => worker.evaluate(async url => {
       const { previews = {} } = await chrome.storage.session.get('previews');
       return Object.values(previews).some(entry => entry.url === url && entry.image.startsWith('data:image/jpeg;base64,'));
-    }, `${base}/${name}`), { timeout: 10000, message: `Capture preview for Tab ${name}` }).toBe(true);
+    }, `${base}/${name}`), { timeout: 10000, message: `Capture preview for Tab ${name}` }).toBe(true).catch(async error => {
+      console.error('Capture diagnostics:', await worker.evaluate(() => globalThis.captureDiagnostics));
+      throw error;
+    });
 
   }
   const [a, b, c] = pages;
