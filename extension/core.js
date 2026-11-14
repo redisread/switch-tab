@@ -12,6 +12,11 @@ globalThis.SwitchTab = {
     catch { return '浏览器标签'; }
   },
   usesOption(shortcut) { return shortcut.includes('⌥') || /(^|\+)(Alt|Option)(\+|$)/i.test(shortcut); },
+  releaseKey(shortcut) {
+    if (shortcut.includes('⌘') || /(^|\+)(Command|Meta)(\+|$)/i.test(shortcut)) return 'Meta';
+    if (this.usesOption(shortcut)) return 'Alt';
+    return null;
+  },
   // Only consume observed releases; a timeout is never evidence of a release.
   released({ down, up, consumed }, invokedAt) {
     return up > consumed && up >= down && down > 0 && up >= invokedAt - 1000;

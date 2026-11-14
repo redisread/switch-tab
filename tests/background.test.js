@@ -17,7 +17,7 @@ globalThis.chrome = {
     query: async query => tabs.filter(tab => (!query.active || tab.active) &&
       (query.windowId === undefined || tab.windowId === query.windowId) && (!query.currentWindow || tab.windowId === 1)),
     get: async id => { const tab = tabs.find(tab => tab.id === id); if (!tab) throw new Error('No tab'); return tab; },
-    update: async id => { activated = id; }, onRemoved: { addListener() {} },
+    update: async id => { activated = id; }, onRemoved: { addListener() {} }, onActivated: { addListener() {} }, onUpdated: { addListener() {} }, onDetached: { addListener() {} },
   },
   windows: { get: async id => ({ id, focused }), getLastFocused: async () => ({ id: lastFocused }) },
   storage: { session: {

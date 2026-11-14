@@ -4,11 +4,11 @@
 
 - 首版支持 macOS Chrome。
 - 按最近使用顺序切换；A → B → C 后首次选择 B。
-- 期望按住修饰键循环选择，松开后确认；具体键位与可靠性方案待确认。
+- 按住 Command 循环选择，松开后确认；Enter 提供兜底。
 - 范围限于当前窗口仍打开的标签，不跨窗口，不恢复已关闭标签。
-- 默认 Option+Q，允许修改；按住 Option 重复 Q 循环，松开确认，Enter 兜底。
+- 默认 ⌘X，允许修改；按住 ⌘ 重复 X 循环，松开确认，Enter 兜底。
 - 普通网页显示居中浮层；受限页面通过工具栏弹窗切换。接受浮层所需网站访问权限。
-- 展示最近 5 个标签的网站图标、标题、域名；首版不提供截图、搜索或关闭标签。
+- 展示最近 5 个标签的网站图标、标题、域名；使用最近访问时采集的缩略图，从左到右排列卡片；不提供搜索或关闭标签。
 - Shift 反向循环、Esc 取消、点击候选确认、失焦取消。
 - 选择期间仅移动高亮，不激活标签；候选顺序在一次切换会话中保持固定。
 - 快速轻按直接返回上一标签，持续按住约 150ms 才显示面板；时序需要实测。
@@ -20,9 +20,9 @@
 
 - 首版要求 Chrome 127+，以支持普通安装扩展调用工具栏弹窗。
 - 每轮以 Chrome 提供的 lastAccessed 建立初始顺序，无需维护第二份历史。时间相同或缺失时以标签栏顺序稳定排序，不宣称能精确还原重启前顺序。
-- 默认 Option+Q 优先保证松键体验；自定义为不含 Option 的组合时使用 Enter 或点击确认，首版不泛化所有修饰键释放语义。
+- 默认 ⌘X 优先保证松键体验；自定义为不含 Command 或 Option 的组合时使用 Enter 或点击确认，首版不泛化所有修饰键释放语义。
 - 没有观察到释放事件时，不靠超时猜测确认；保留面板等待 Enter 或点击。受限页面工具栏弹窗以 Enter 或点击确认为可靠路径。
-- 数据仅在本机处理，不设置账户、服务端或遥测，不保存网页正文或截图。
+- 数据仅在本机处理，不设置账户、服务端或遥测，不保存网页正文；缩略图保存在本机临时会话缓存，退出浏览器清空。
 
 ## 实现前技术验证
 
@@ -40,3 +40,12 @@
 参考：[commands](https://developer.chrome.com/docs/extensions/reference/api/commands)、[action](https://developer.chrome.com/docs/extensions/reference/api/action)、[popup](https://developer.chrome.com/docs/extensions/develop/ui/add-popup)。
 
 补充：[tabs.lastAccessed](https://developer.chrome.com/docs/extensions/reference/api/tabs)、[storage.session](https://developer.chrome.com/docs/extensions/reference/api/storage)、[无痕模式](https://developer.chrome.com/docs/extensions/reference/manifest/incognito)。
+
+## 0.2 UI 与缩略图
+
+- 用户将默认快捷键改为 ⌘X，反向 ⌘⇧X；支持 Command/Option 松键确认。
+- 参照 Arc 的预览在上、图标标题在下的横向卡片，选中状态使用填充和边框。空间不足时水平滚动，选择项自动进入视口。
+- 普通网页在激活、加载完成或滚动结束后采集可见区域；不会为补齐预览激活其他标签。
+- 缩略图压缩到最多 480px 宽，最多 20 张且内存预算约 4MB，仅使用 storage.session；关闭/导航/跨窗口移动时失效。
+- captureVisibleTab 需要新增 `<all_urls>` 主机权限；实际仅采集 HTTP/HTTPS，不采集无痕或内部页面。
+- UI 参考：[Arc 切换器截图](https://allthings.how/how-to-jump-back-to-last-tab-in-arc-browser/)。

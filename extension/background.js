@@ -1,4 +1,6 @@
 import './core.js';
+import { Previews } from './previews.js';
+const previews = new Previews(chrome);
 
 const key = id => `session:${id}`;
 const ownPage = sender => sender.id === chrome.runtime.id &&
@@ -24,7 +26,7 @@ async function snapshot(sender) {
   const session = { token: crypto.randomUUID(), sourceId: source.id, windowId: source.windowId,
     ids: tabs.map(tab => tab.id), created: Date.now() };
   await chrome.storage.session.set({ [key(source.id)]: session });
-  return { ...session, tabs };
+  return { ...session, tabs: await previews.attach(tabs, source.windowId) };
 }
 
 async function commit(message, sender) {
@@ -41,6 +43,9 @@ async function commit(message, sender) {
 
 async function handle(message, sender) {
   if (sender.id !== chrome.runtime.id || (!sender.tab && !ownPage(sender))) return;
+  if (message.type === 'preview-request' && sender.tab && sender.frameId === 0) {
+    previews.schedule(sender.tab.id); return {};
+  }
   if (message.type === 'frame-key' && sender.tab) {
     // Keyboard events do not bubble out of an iframe. Relay only trusted
     // extension messages to its own top frame; no page postMessage bridge.
@@ -85,4 +90,17 @@ chrome.commands.onCommand.addListener((command, tab) => {
   })().catch(error => console.warn('Switch Tab:', error.message));
 });
 
-chrome.tabs.onRemoved.addListener(id => { void chrome.storage.session.remove(key(id)); });
+chrome.tabs.onRemoved.addListener(id => {
+  void chrome.storage.session.remove(key(id)); void previews.invalidate(id);
+});
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  // Invalidate any in-flight capture when the window switches away and back.
+  for (const [id, revision] of previews.revisions) previews.revisions.set(id, revision + 1);
+  previews.revisions.set(tabId, (previews.revisions.get(tabId) || 0) + 1);
+  previews.schedule(tabId);
+});
+chrome.tabs.onUpdated.addListener((id, change, tab) => {
+  if (change.url || change.status === 'loading') void previews.invalidate(id);
+  if (tab.active && change.status === 'complete') previews.schedule(id);
+});
+chrome.tabs.onDetached.addListener(id => { void previews.invalidate(id); });

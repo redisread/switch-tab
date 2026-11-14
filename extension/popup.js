@@ -24,8 +24,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape') { window.close(); return; }
   if (event.key === 'Enter' && event.target.id !== 'shortcuts') { event.preventDefault(); void confirm(); }
-  if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
-    event.preventDefault(); select(event.key === 'ArrowUp' ? -1 : 1);
+  if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    event.preventDefault(); select(['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1);
   }
 });
 document.querySelector('#shortcuts').addEventListener('click', () => {
@@ -41,7 +41,7 @@ document.querySelector('#shortcuts').addEventListener('click', () => {
     await chrome.storage.session.remove('popupInvocation');
     if (popupInvocation?.sourceId === data.sourceId && Date.now() - popupInvocation.at < 2000 && popupInvocation.delta < 0) offset--;
     ui = new SwitchTabUI({ mount: document.querySelector('#mount'), tabs: data.tabs, popup: true,
-      hint: 'Enter 确认 · ↑↓ 选择 · Esc 取消',
+      hint: 'Enter 确认 · ←→ 选择 · Esc 取消',
       onChoose: index => { offset = index; void confirm(); }, onCancel: () => window.close() });
     ui.select(SwitchTab.wrap(offset, data.tabs.length));
   } catch (error) {

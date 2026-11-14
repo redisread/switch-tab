@@ -28,3 +28,10 @@ test('custom shortcuts without Option do not promise release confirmation', () =
   assert.equal(usesOption('⌥Q'), true); assert.equal(usesOption('⌥⇧Q'), true);
   assert.equal(usesOption('Option+Q'), true); assert.equal(usesOption('Command+Q'), false);
 });
+test('Command and Option release keys match actual Chrome shortcut encodings', () => {
+  assert.equal(SwitchTab.releaseKey('⌘X'), 'Meta');
+  assert.equal(SwitchTab.releaseKey('⌘⇧X'), 'Meta');
+  assert.equal(SwitchTab.releaseKey('Command+X'), 'Meta');
+  assert.equal(SwitchTab.releaseKey('Alt+X'), 'Alt');
+  assert.equal(SwitchTab.releaseKey('Ctrl+J'), null);
+});
