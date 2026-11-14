@@ -1,0 +1,48 @@
+{
+  "brand": "Switch Tab",
+  "tagline": "回到刚才，轻松切换。",
+  "brief": "已选定 B「跳格 S」。两段错位曲线组成字母 S，为最近标签切换器提供一个紧凑、轻快的识别符号。",
+  "adjectives": [
+    "轻快",
+    "清晰",
+    "克制",
+    "易识别"
+  ],
+  "criteria": "小尺寸保持分离；黑白同样成立。",
+  "industry": "software",
+  "mockups": [
+    "favicon-tab",
+    "app-icon",
+    "readme",
+    "website",
+    "sticker",
+    "social"
+  ],
+  "brand_color": "#6355D9",
+  "tile_color": "#6355D9",
+  "greyscale": false,
+  "final": true,
+  "round": 2,
+  "concepts": [
+    {
+      "name": "跳格 S",
+      "symbol": "masters/symbol.svg",
+      "lockup": "masters/horizontal.svg",
+      "stacked": "masters/stacked.svg",
+      "avatar": "masters/app-icon.svg",
+      "symbol_on_tile": "masters/symbol-reversed.svg",
+      "symbol_on_dark": "masters/symbol-reversed.svg",
+      "lockup_on_dark": "masters/horizontal-reversed.svg",
+      "idea": "两段错位的曲线，让 S 有了切换的节奏。",
+      "rationale": [
+        "主轮廓保留 B 方案，小尺寸加宽中缝。",
+        "紫罗兰底与白色 S，兼顾浅色和深色工具栏。",
+        "字标已转曲，独立于字体安装环境。"
+      ]
+    }
+  ],
+  "recommendation": "已确定采用 B · 跳格 S。",
+  "next_steps": [
+    "使用套件中的原始文件，保持比例和留白。"
+  ]
+}

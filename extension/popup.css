@@ -1,0 +1,4 @@
+:root { color-scheme: light dark; }
+body { width:100%;min-height:100vh;margin:0;display:grid;align-content:center;background:#eff0f3;color:#252933;font:12px -apple-system,BlinkMacSystemFont,sans-serif; }
+#mount { min-width:0; }
+@media(prefers-color-scheme:dark) { body { background:#24262b;color:#eef0f4; } }
