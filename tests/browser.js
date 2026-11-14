@@ -30,6 +30,9 @@ const context = await chromium.launchPersistentContext(profile, {
 });
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  // The serviceworker event can precede module evaluation and listener registration.
+  await expect.poll(() => worker.evaluate(() => typeof globalThis.driver?.invoke),
+    { timeout: 10000, message: 'Background module ready' }).toBe('function');
   const shortcuts = await worker.evaluate(() => chrome.commands.getAll());
   const actualShortcut = shortcuts.find(item => item.name === 'switch-next').shortcut;
   assert.ok(actualShortcut, 'Default shortcut must be assigned');
