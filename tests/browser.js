@@ -37,7 +37,9 @@ manifest.background.service_worker = 'driver.js';
 await writeFile(join(extension, 'manifest.json'), JSON.stringify(manifest));
 const context = await chromium.launchPersistentContext(profile, {
   channel: 'chromium', viewport: null, headless: process.env.HEADED !== '1',
-  args: [ `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  // Xvfb has no hardware GPU; use software rendering for reliable image readback.
+  args: [ ...(process.platform === 'linux' ? ['--disable-gpu'] : []),
+    `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
