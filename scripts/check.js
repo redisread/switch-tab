@@ -6,5 +6,6 @@ for (const file of await readdir('extension')) {
   if (file.endsWith('.js')) execFileSync(process.execPath, ['--check', `extension/${file}`]);
 }
 for (const file of [manifest.background.service_worker, 'popup.html',
-  ...manifest.content_scripts.flatMap(script => script.js)]) await readFile(`extension/${file}`);
+  ...manifest.content_scripts.flatMap(script => script.js),
+  ...Object.values(manifest.icons || {}), ...Object.values(manifest.action.default_icon || {})]) await readFile(`extension/${file}`);
 console.log('Manifest resources and JavaScript syntax verified.');

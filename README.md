@@ -1,5 +1,7 @@
 # Switch Tab
 
+<img src="design/logo/kit/masters/horizontal.svg" width="360" alt="Switch Tab 标志：跳格 S" />
+
 一个面向 macOS Chrome 的最近标签切换扩展。按最近使用顺序，在当前窗口的标签之间快速切换。
 
 ## 安装
@@ -71,3 +73,7 @@ npm run package
 浏览器测试使用临时配置加载真实扩展，验证消息、标签切换和 UI；通过测试注入命令消息，**不等同于验证 macOS 原生快捷键分发**。截图输出到 `test-results/`，安装包输出到 `dist/`。
 
 设计见 [docs/design.md](docs/design.md)，验收范围见 [docs/testing.md](docs/testing.md)。
+
+## 品牌资源
+
+标志采用 B「跳格 S」：两段错位的轮廓组成 S，主色为紫罗兰色 `#6355D9`。矢量文件、黑白版、横竖组合、网页图标及使用说明位于 [design/logo/kit](design/logo/kit)。插件已内置 16、24、32、48、128px PNG 图标。

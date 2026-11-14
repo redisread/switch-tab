@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Switch Tab — 最近标签切换",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "横向缩略图卡片切换最近标签。⌘X 选择，松开 ⌘ 确认。",
   "minimum_chrome_version": "127",
   "incognito": "not_allowed",
@@ -16,7 +16,13 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Switch Tab"
+    "default_title": "Switch Tab",
+    "default_icon": {
+      "16": "icon-16.png",
+      "24": "icon-24.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png"
+    }
   },
   "commands": {
     "switch-next": {
@@ -63,5 +69,11 @@
   ],
   "host_permissions": [
     "<all_urls>"
-  ]
+  ],
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  }
 }
