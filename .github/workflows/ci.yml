@@ -1,0 +1,41 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install -y openbox x11-utils
+      - run: |
+          xvfb-run -a bash -ec '
+            openbox >/tmp/switch-tab-openbox.log 2>&1 &
+            window_manager_pid=$!
+            trap "kill $window_manager_pid 2>/dev/null || true" EXIT
+            for attempt in {1..50}; do
+              if xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"; then break; fi
+              sleep 0.1
+            done
+            if ! xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id #"; then
+              cat /tmp/switch-tab-openbox.log
+              exit 1
+            fi
+            npm run test:browser:headed
+          '
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: switch-tab
+          path: |
+            dist/*.zip
+            test-results/*.png
