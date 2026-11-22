@@ -1,0 +1,75 @@
+name: Chrome Web Store
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Query status or submit the selected version tag
+        type: choice
+        options: [status, publish]
+        default: status
+permissions:
+  contents: read
+concurrency:
+  group: chrome-web-store-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.event_name == 'push' || inputs.operation == 'publish'
+    uses: ./.github/workflows/ci.yml
+  store:
+    needs: verify
+    if: always() && (needs.verify.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'status'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+      CWS_ITEM_ID: ${{ vars.CWS_ITEM_ID }}
+      OPERATION: ${{ github.event_name == 'push' && 'publish' || inputs.operation }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate release source
+        if: env.OPERATION == 'publish'
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const {version} = JSON.parse(fs.readFileSync("extension/manifest.json"));
+            if (process.env.GITHUB_REF !== `refs/tags/v${version}`) throw Error("Select a version tag matching manifest.version");
+          '
+      - uses: actions/download-artifact@v4
+        if: env.OPERATION == 'publish'
+        with:
+          name: switch-tab
+          path: release-artifact
+      - name: Check configuration
+        env:
+          PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$CWS_PUBLISHER_ID"
+          test -n "$CWS_ITEM_ID"
+          test -n "$PROVIDER"
+          test -n "$SERVICE_ACCOUNT"
+      - uses: google-github-actions/auth@v3
+        id: auth
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Query or submit to Chrome Web Store
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/chrome-web-store.js "$OPERATION"
